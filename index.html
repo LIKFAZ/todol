@@ -3,86 +3,179 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Shopping List App</title>
+  <title>Todo List App</title>
   <link rel="stylesheet" href="main.css">
 </head>
 
 <body>
-  <div id="shopping-list">
+  <div id="todo-list">
     <div class="header">
       <h1>{{ header || 'Welcome' }}</h1>
       <button v-if="editing" @click="doEdit(false)" class="btn btn-cancel">Cancel</button>
-      <button v-else @click="doEdit(true)" class="btn btn-primry">Add Item</button>
+      <button v-else @click="doEdit(true)" class="btn btn-primary">Add Task</button>
     </div>
     
-    <div v-if="editing" class="add-item-form">
+    <div v-if="editing" class="add-task-form">
       <input 
-        @keyup.enter="saveItem" 
-        type="text" v-model="newItem" placeholder = "Add an Item">
+        @keyup.enter="saveTask" 
+        type="text" 
+        v-model="newTask" 
+        placeholder="Add a new task"
+      >
       <label>
-        <input type="checkbox" v-model="newItemHighPriority">
+        <input type="checkbox" v-model="newTaskHighPriority">
         High Priority
       </label>
       <button 
-        @click="saveItem" 
+        @click="saveTask" 
         class="btn btn-primary">
-        Save Item
+        Save Task
       </button>
     </div>
-    <p v-if="items.length === 0">Nice job! You've bought all your items!</p>
+    
+    <div class="filters">
+      <button 
+        @click="filter = 'all'"
+        :class="{active: filter === 'all'}"
+        class="btn btn-filter">
+        All ({{ totalTasks }})
+      </button>
+      <button 
+        @click="filter = 'active'"
+        :class="{active: filter === 'active'}"
+        class="btn btn-filter">
+        Active ({{ activeTasks }})
+      </button>
+      <button 
+        @click="filter = 'completed'"
+        :class="{active: filter === 'completed'}"
+        class="btn btn-filter">
+        Completed ({{ completedTasks }})
+      </button>
+    </div>
+    
+    <p v-if="filteredTasks.length === 0" class="empty-message">
+      <span v-if="filter === 'all'">No tasks yet. Add your first task!</span>
+      <span v-if="filter === 'active'">No active tasks. Good job!</span>
+      <span v-if="filter === 'completed'">No completed tasks yet.</span>
+    </p>
+    
     <ul>
       <li 
-        v-for="item in reversedItems" 
-        @click="togglePurchased(item)"
-        :key="item.id"
-        class="static-class"
-        :class="{strikeout: item.purchased, priority: item.highPriority}"
+        v-for="task in filteredTasks" 
+        :key="task.id"
+        class="task-item"
+        :class="{
+          'completed': task.completed, 
+          'priority': task.highPriority,
+          'low-priority': !task.highPriority && !task.completed
+        }"
       >
-        {{item.label}}
+        <input 
+          type="checkbox" 
+          :checked="task.completed"
+          @change="toggleCompleted(task)"
+          class="task-checkbox"
+        >
+        <span 
+          @click="toggleCompleted(task)"
+          class="task-label"
+        >
+          {{ task.label }}
+        </span>
+        <button 
+          @click="deleteTask(task.id)"
+          class="btn btn-delete">
+          ×
+        </button>
       </li>
     </ul>
+    
+    <div v-if="totalTasks > 0" class="task-summary">
+      <span v-if="activeTasks > 0">
+        {{ activeTasks }} {{ activeTasks === 1 ? 'task' : 'tasks' }} left
+      </span>
+      <button 
+        v-if="completedTasks > 0"
+        @click="clearCompleted"
+        class="btn btn-clear">
+        Clear completed ({{ completedTasks }})
+      </button>
+    </div>
   </div>
+  
   <script src="https://unpkg.com/vue@3"></script>
   <script>
-    const shoppingListApp = Vue.createApp({
+    const todoListApp = Vue.createApp({
       data() {
         return {
-          header: 'Shopping List App',
-          editing:false,
-          newItem: '',
-          newItemHighPriority: false,
-          items:[
-            {id: 1, label:'10 party hats', purchased: true, highPriority: false},
-            {id: 2, label:'2 board games', purchased: true, highPriority: false},
-            {id: 3, label:'20 cups', purchased: false, highPriority: true},
+          header: 'Todo List App',
+          editing: false,
+          newTask: '',
+          newTaskHighPriority: false,
+          filter: 'all',
+          tasks: [
+            {id: 1, label: 'Learn Vue.js basics', completed: true, highPriority: true},
+            {id: 2, label: 'Create a todo list app', completed: true, highPriority: true},
+            {id: 3, label: 'Style the application', completed: false, highPriority: true},
+            {id: 4, label: 'Add filtering functionality', completed: false, highPriority: false},
+            {id: 5, label: 'Test the application', completed: false, highPriority: false},
+            {id: 6, label: 'Deploy to GitHub Pages', completed: false, highPriority: false},
           ]
         }
       },
-      computed:{
-        reversedItems(){
-          return [...this.items].reverse()
+      computed: {
+        totalTasks() {
+          return this.tasks.length;
+        },
+        activeTasks() {
+          return this.tasks.filter(task => !task.completed).length;
+        },
+        completedTasks() {
+          return this.tasks.filter(task => task.completed).length;
+        },
+        filteredTasks() {
+          switch(this.filter) {
+            case 'active':
+              return this.tasks.filter(task => !task.completed);
+            case 'completed':
+              return this.tasks.filter(task => task.completed);
+            default:
+              return [...this.tasks].reverse();
+          }
         }
       },
-      methods:{
-        saveItem(){
-          this.items.push({
-            id:this.items.length + 1, 
-            label: this.newItem,
-            highPriority: this.newItemHighPriority
-          })
-          this.newItem = ""
-          this.newItemHighPriority = false
+      methods: {
+        saveTask() {
+          if (this.newTask.trim() === '') return;
+          
+          this.tasks.push({
+            id: Date.now(),
+            label: this.newTask,
+            completed: false,
+            highPriority: this.newTaskHighPriority
+          });
+          
+          this.newTask = "";
+          this.newTaskHighPriority = false;
+          this.editing = false;
         },
-        doEdit(editing){
-          this.editing = editing
-          this.newItem = ""
-          this.newItemHighPriority = false
+        doEdit(editing) {
+          this.editing = editing;
+          this.newTask = "";
+          this.newTaskHighPriority = false;
         },
-        togglePurchased(item){
-          item.purchased = !item.purchased
+        toggleCompleted(task) {
+          task.completed = !task.completed;
+        },
+        deleteTask(taskId) {
+          this.tasks = this.tasks.filter(task => task.id !== taskId);
+        },
+        clearCompleted() {
+          this.tasks = this.tasks.filter(task => !task.completed);
         }
       }
-    }).mount('#shopping-list')
+    }).mount('#todo-list')
   </script>
 </body>
 
